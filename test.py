@@ -37,8 +37,6 @@ def index(args):
 		writer.commit()
 		ix.close()
 
-def updateIndex(args):
-	
 
 def search(args):
 	try:
