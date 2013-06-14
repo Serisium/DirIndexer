@@ -22,6 +22,8 @@ def index(args):
 		
 		dir_nm = removeNonAscii(args.directory)
 		for root, sub_folders, files in os.walk(dir_nm):
+			files = [f for f in files if not f[0] == '.']
+			sub_folders[:] = [d for d in sub_folders if not d[0] == '.']
 			for cur_file in files:
 				fullpath =  root + "/" + cur_file
 				cur_file = open(fullpath)
@@ -31,10 +33,12 @@ def index(args):
 				file_name = u"%s" % cur_file.name
 				path = u"%s" % os.path.join(root, cur_file.name)
 				writer.add_document(title=file_name, path=path, content=content)
-				#print title + '\t\t' + path + '\t\t' + content + '\n' 
-		writer.commit()
 	finally:
+		writer.commit()
 		ix.close()
+
+def updateIndex(args):
+	
 
 def search(args):
 	try:
@@ -48,8 +52,7 @@ def search(args):
 			print results
 			results.fragmenter = highlight.ContextFragmenter(maxchars = 300, surround = 50, charlimit = 1000000)
 			results.order = highlight.SCORE
-			i=1
-			for result in results:
+			for i, result in enumerate(results):
 				print "Result " + str(i) + ": " + result["path"]
 				
 				i+=1
@@ -71,6 +74,7 @@ if __name__ == '__main__':
 	parser_index.add_argument('directory', help="the directory to search")
 	parser_index.set_defaults(func=index)
 	
+
 	parser_search = subparsers.add_parser('search', help="search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
 	parser_search.set_defaults(func=search)
