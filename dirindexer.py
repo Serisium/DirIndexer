@@ -21,9 +21,11 @@ def index(args):
 		writer = ix.writer()
 		dir_nm = removeNonAscii(args.directory)
 		for root, sub_folders, files in os.walk(dir_nm):
+			#Remove hidden files
 			files = [f for f in files if not f[0] == '.']
 			sub_folders[:] = [d for d in sub_folders if not d[0] == '.'] #os.walk will not process deleted directories
 
+			#Remove excluded files
 			if args.exclude is not None:
 				files = [f for f in files if not os.path.splitext(f)[1][1:] in args.exclude]
 			
@@ -38,32 +40,38 @@ def update(args):
 	try:
 		ix = get_ix()
 		writer = ix.writer()
-		indexed_paths = set()
-		to_index = set()
+		indexed_paths = set()	#Holds all paths already indexed
+		to_index = set()	#Holds a list of paths to index later
 
 		with ix.searcher() as searcher:
 			for fields in searcher.all_stored_fields():
 				indexed_path = fields['path']
 				indexed_paths.add(indexed_path)
-				
+				#if the file has been deleted, remove it from the index	
+
 				if not os.path.exists(indexed_path):
 					writer.delete_by_term('path',indexed_path)
 				else:
 					indexed_time = fields['date']
 					mtime = os.path.getmtime(indexed_path)
+
+					#If file has been changed, delete it and add it to the queue
 					if mtime > indexed_time:
 						writer.delete_by_term('path',indexed_path)
 						to_index.add(indexed_path)
 			
 			for root, sub_folders, files in os.walk(args.directory):
+				#Remove hidden files
 				files = [f for f in files if not f[0] == '.']
 				sub_folders[:] = [d for d in sub_folders if not d[0] == '.']
-				
+
+				#Remove excluded files
 				if args.exclude is not None:
 					files = [f for f in files if not os.path.splitext(f)[1][1:] in args.exclude]
 				
 				for cur_file in files:
 					path = u"%s" % os.path.join(root,cur_file)
+					#If a file is in the queue or is new, add it
 					if path in to_index or path not in indexed_paths:
 						add_doc(writer, path)
 	
@@ -95,7 +103,6 @@ def search(args):
 			for i, result in enumerate(results):
 				print "Result " + str(i) + ": " + result["path"]
 				
-				i+=1
 				with open(result["path"]) as f:
 					file_content = u"%s" % removeNonAscii(f.read())
 				print result.highlights("content", text=file_content, top=10)
@@ -114,6 +121,7 @@ def clear(args):
 	os.rmdir(os.getcwd()+"/.indexdir/")
 
 def removeNonAscii(s):
+	#fixes UnicodeDecodeError by removing all bytes larger than 128
 	return "".join(i for i in s if ord(i)<128)
 
 if __name__ == '__main__':
