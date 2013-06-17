@@ -6,7 +6,7 @@ import os
 import argparse
 
 def get_ix():
-	schema = Schema(title=TEXT(stored=True), path=ID(stored=True), content=TEXT, date=STORED)
+	schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
 	#create if not exists
 	if not os.path.exists(".indexdir"):
 		os.mkdir(".indexdir")
@@ -24,7 +24,8 @@ def index(args):
 			files = [f for f in files if not f[0] == '.']
 			sub_folders[:] = [d for d in sub_folders if not d[0] == '.'] #os.walk will not process deleted directories
 
-			files = [f for f in files if not os.path.splitext(f)[1][1:] in args.exclude]
+			if args.exclude is not None:
+				files = [f for f in files if not os.path.splitext(f)[1][1:] in args.exclude]
 			
 			for cur_file in files:
 				
@@ -36,12 +37,14 @@ def index(args):
 				content = u"%s" % removeNonAscii(cur_file.read())
 				file_name = u"%s" % cur_file.name
 				path = u"%s" % os.path.join(root, cur_file.name)
-				modtime = os.path.getmtime(path)
+				modtime = os.path.getmtime(fullpath)
 				writer.add_document(title=file_name, path=fullpath, content=content, date=modtime)
 	finally:
 		writer.commit()
 		ix.close()
 
+def update(args):
+	return
 
 def search(args):
 	try:
