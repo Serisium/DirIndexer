@@ -28,23 +28,57 @@ def index(args):
 				files = [f for f in files if not os.path.splitext(f)[1][1:] in args.exclude]
 			
 			for cur_file in files:
-				
 				fullpath = u"%s" % os.path.join(root, cur_file)
-				#fullpath =  u"%s" % root + "/"  + cur_file
-				cur_file = open(fullpath)
-				print "indexing %s" % cur_file.name
-				#items to index
-				content = u"%s" % removeNonAscii(cur_file.read())
-				file_name = u"%s" % cur_file.name
-				path = u"%s" % os.path.join(root, cur_file.name)
-				modtime = os.path.getmtime(fullpath)
-				writer.add_document(title=file_name, path=fullpath, content=content, date=modtime)
+				add_doc(writer, fullpath)
 	finally:
 		writer.commit()
 		ix.close()
 
 def update(args):
-	return
+	try:
+		ix = get_ix()
+		writer = ix.writer()
+		indexed_paths = set()
+		to_index = set()
+
+		with ix.searcher() as searcher:
+			for fields in searcher.all_stored_fields():
+				indexed_path = fields['path']
+				indexed_paths.add(indexed_path)
+				
+				if not os.path.exists(indexed_path):
+					writer.delete_by_term('path',indexed_path)
+				else:
+					indexed_time = fields['date']
+					mtime = os.path.getmtime(indexed_path)
+					if mtime > indexed_time:
+						writer.delete_by_term('path',indexed_path)
+						to_index.add(indexed_path)
+			
+			for root, sub_folders, files in os.walk(args.directory):
+				files = [f for f in files if not f[0] == '.']
+				sub_folders[:] = [d for d in sub_folders if not d[0] == '.']
+				
+				if args.exclude is not None:
+					files = [f for f in files if not os.path.splitext(f)[1][1:] in args.exclude]
+				
+				for cur_file in files:
+					path = u"%s" % os.path.join(root,cur_file)
+					if path in to_index or path not in indexed_paths:
+						add_doc(writer, path)
+	
+	finally:
+		writer.commit()
+		ix.close()
+
+def add_doc(writer, path):
+	cur_file = open(path)
+	content = u"%s" % removeNonAscii(cur_file.read())
+	file_name = u"%s" % cur_file.name
+	path = u"%s" % path
+	modtime = os.path.getmtime(path)
+	print "Indexing %s" % file_name 
+	writer.add_document(title=file_name, path=path, content=content, date=modtime)
 
 def search(args):
 	try:
@@ -93,6 +127,11 @@ if __name__ == '__main__':
 	parser_index.add_argument('directory', help="the directory to search")
 	parser_index.set_defaults(func=index)
 	parser_index.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from index")
+
+	parser_update = subparsers.add_parser('update',help="Update the index with new or edited files")
+	parser_update.add_argument('directory', help="The directory to update")
+	parser_update.set_defaults(func=update)
+	parser_update.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from update")
 
 	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
