@@ -66,19 +66,32 @@ def search(args):
 	finally:
 		ix.close()
 
+def clear(args):
+	print "Deleting the current index..."
+	for root, dirs, files in os.walk(os.getcwd()+"/.indexdir/", topdown=False):
+		for name in files:
+			print name
+			os.remove(os.path.join(root,name))
+		for name in dirs:
+			os.rmdir(os.path.join(root,name))
+	os.rmdir(os.getcwd()+"/.indexdir/")
+
 def removeNonAscii(s):
 	return "".join(i for i in s if ord(i)<128)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='index a directory or search for keywords.')
 	subparsers = parser.add_subparsers()
+	
+	parser_clear = subparsers.add_parser("clear", help="Delete the current index.")
+	parser_clear.set_defaults(func=clear)
 
-	parser_index = subparsers.add_parser('index', help="index a given directory for future searches")
+	parser_index = subparsers.add_parser('index', help="Index a given directory for future searches")
 	parser_index.add_argument('directory', help="the directory to search")
 	parser_index.set_defaults(func=index)
 	parser_index.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from index")
 
-	parser_search = subparsers.add_parser('search', help="search the indexed directory for a keyword")
+	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
 	parser_search.set_defaults(func=search)
 	
