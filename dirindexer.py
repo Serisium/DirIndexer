@@ -4,6 +4,7 @@ from whoosh import highlight
 from whoosh.fields import *
 import os
 import argparse
+import codecs
 
 def get_ix():
 	schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
@@ -19,7 +20,7 @@ def index(args):
 	try:
 		ix = get_ix()
 		writer = ix.writer()
-		dir_nm = removeNonAscii(args.directory)
+		dir_nm = u"%s" % args.directory
 		for root, sub_folders, files in os.walk(dir_nm):
 			#Remove hidden files
 			files = [f for f in files if not f[0] == '.']
@@ -80,8 +81,8 @@ def update(args):
 		ix.close()
 
 def add_doc(writer, path):
-	cur_file = open(path)
-	content = u"%s" % removeNonAscii(cur_file.read())
+	cur_file = codecs.open(path, encoding = 'utf-8', errors='ignore')
+	content = cur_file.read()
 	file_name = u"%s" % cur_file.name
 	path = u"%s" % path
 	modtime = os.path.getmtime(path)
@@ -91,7 +92,7 @@ def add_doc(writer, path):
 def search(args):
 	try:
 		ix = get_ix()
-		search_term = removeNonAscii(args.keyword)
+		search_term = unicode(args.keyword)
 	
 		from whoosh.qparser import QueryParser
 		with ix.searcher() as searcher:
@@ -103,8 +104,8 @@ def search(args):
 			for i, result in enumerate(results):
 				print "Result " + str(i) + ": " + result["path"]
 				
-				with open(result["path"]) as f:
-					file_content = u"%s" % removeNonAscii(f.read())
+				with codecs.open(result["path"], encoding='utf-8', errors='ignore') as f:
+					file_content = f.read()
 				print result.highlights("content", text=file_content, top=10)
 				print "\n"
 	finally:
@@ -119,10 +120,6 @@ def clear(args):
 		for name in dirs:
 			os.rmdir(os.path.join(root,name))
 	os.rmdir(os.getcwd()+"/.indexdir/")
-
-def removeNonAscii(s):
-	#fixes UnicodeDecodeError by removing all bytes larger than 128
-	return "".join(i for i in s if ord(i)<128)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='index a directory or search for keywords.')
