@@ -26,6 +26,7 @@ def index(args):
 		print args.all	
 		writer = ix.writer(procs=procs)
 		dir_nm = u"%s" % args.directory
+		x=0
 		for root, sub_folders, files in os.walk(dir_nm):
 			#Remove hidden files
 			if not args.all:
@@ -39,7 +40,9 @@ def index(args):
 			for cur_file in files:
 				fullpath = u"%s" % os.path.join(root, cur_file)
 				add_doc(writer, fullpath)
+				x+=1
 	finally:
+		print "Writing " + str(x) + " files to index."
 		writer.commit()
 		ix.close()
 	
@@ -53,7 +56,8 @@ def update(args):
 		writer = ix.writer(procs=procs)
 		indexed_paths = set()	#Holds all paths already indexed
 		to_index = set()	#Holds a list of paths to index later
-
+		
+		x=0
 		with ix.searcher() as searcher:
 			for fields in searcher.all_stored_fields():
 				indexed_path = fields['path']
@@ -86,8 +90,10 @@ def update(args):
 					#If a file is in the queue or is new, add it
 					if path in to_index or path not in indexed_paths:
 						add_doc(writer, path)
-	
+						x+=1
+
 	finally:
+		print "Writing " + str(x) + " files to index."
 		writer.commit()
 		ix.close()
 
