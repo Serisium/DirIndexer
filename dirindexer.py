@@ -5,6 +5,7 @@ from whoosh.fields import *
 import os
 import argparse
 import codecs
+import multiprocessing
 
 def get_ix():
 	schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
@@ -19,7 +20,11 @@ def get_ix():
 def index(args):
 	try:
 		ix = get_ix()
-		writer = ix.writer()
+		procs = multiprocessing.cpu_count()/2
+		if args.processors is not None:
+			procs = args.processors
+		
+		writer = ix.writer(procs=procs)
 		dir_nm = u"%s" % args.directory
 		for root, sub_folders, files in os.walk(dir_nm):
 			#Remove hidden files
@@ -36,11 +41,15 @@ def index(args):
 	finally:
 		writer.commit()
 		ix.close()
-
+	
 def update(args):
 	try:
 		ix = get_ix()
-		writer = ix.writer()
+		procs = multiprocessing.cpu_count()/2
+		if args.processors is not None:
+			procs = args.processors
+		
+		writer = ix.writer(procs=procs)
 		indexed_paths = set()	#Holds all paths already indexed
 		to_index = set()	#Holds a list of paths to index later
 
@@ -132,11 +141,13 @@ if __name__ == '__main__':
 	parser_index.add_argument('directory', help="the directory to search")
 	parser_index.set_defaults(func=index)
 	parser_index.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from index")
+	parser_index.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
 
 	parser_update = subparsers.add_parser('update',help="Update the index with new or edited files")
 	parser_update.add_argument('directory', help="The directory to update")
 	parser_update.set_defaults(func=update)
 	parser_update.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from update")
+	parser_update.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
 
 	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
@@ -144,4 +155,3 @@ if __name__ == '__main__':
 	
 	args=parser.parse_args()
 	args.func(args)
-
