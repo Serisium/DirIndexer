@@ -1,7 +1,7 @@
 from whoosh.index import create_in
 from whoosh.index import open_dir
-from whoosh import highlight
 from whoosh.fields import *
+from whoosh import highlight
 import os
 import argparse
 import codecs
@@ -110,8 +110,8 @@ def search(args):
 			query = QueryParser("content", ix.schema).parse(u"%s" % search_term)
 			results = searcher.search(query, terms=True)
 			print results
-			results.fragmenter = highlight.ContextFragmenter(maxchars = 300, surround = 50, charlimit = 1000000)
-			results.order = highlight.SCORE
+			results.fragmenter = highlight.ContextFragmenter(maxchars=200, surround=20)
+			results.formatter = ColorFormatter(mode=args.color)
 			for i, result in enumerate(results):
 				print "Result " + str(i) + ": " + result["path"]
 				
@@ -121,6 +121,21 @@ def search(args):
 				print "\n"
 	finally:
 		ix.close()
+
+class ColorFormatter(highlight.Formatter):
+	#Formatter for seach output
+
+	def __init__(self, between="\n", mode='auto'):
+		self.between = between
+		self.mode = mode
+
+	def format_token(self, text, token, replace=False):
+		tokentext = highlight.get_text(text, token, False)
+		#If stdin == stdout, the programs output is not being piped and colored output is fine
+		if self.mode == 'always' or (self.mode == 'auto' and os.fstat(0) == os.fstat(1)):
+			return "\033[1;31m%s\033[1;m" % tokentext
+		else:
+			return tokentext
 
 def clear(args):
 	print "Deleting the current index..."
@@ -135,9 +150,6 @@ def clear(args):
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='index a directory or search for keywords.')
 	subparsers = parser.add_subparsers()
-	
-	parser_clear = subparsers.add_parser("clear", help="Delete the current index.")
-	parser_clear.set_defaults(func=clear)
 
 	parser_index = subparsers.add_parser('index', help="Index a given directory for future searches")
 	parser_index.add_argument('directory', help="the directory to search")
@@ -151,11 +163,16 @@ if __name__ == '__main__':
 	parser_update.set_defaults(func=update)
 	parser_update.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from update")
 	parser_update.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
-	parser_update.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in index")
+	parser_update.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in update")
 
 	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
 	parser_search.set_defaults(func=search)
-	
+	parser_search.add_argument('-c', '--color', choices=['auto','always','never'], default='auto', type=str, help="Highlight the search term")
+		
+	parser_clear = subparsers.add_parser("clear", help="Delete the current index.")
+	parser_clear.set_defaults(func=clear)
+
 	args=parser.parse_args()
 	args.func(args)
+
