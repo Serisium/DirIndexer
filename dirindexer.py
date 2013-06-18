@@ -23,13 +23,14 @@ def index(args):
 		procs = multiprocessing.cpu_count()/2
 		if args.processors is not None:
 			procs = args.processors
-		
+		print args.all	
 		writer = ix.writer(procs=procs)
 		dir_nm = u"%s" % args.directory
 		for root, sub_folders, files in os.walk(dir_nm):
 			#Remove hidden files
-			files = [f for f in files if not f[0] == '.']
-			sub_folders[:] = [d for d in sub_folders if not d[0] == '.'] #os.walk will not process deleted directories
+			if not args.all:
+				files = [f for f in files if not f[0] == '.']
+				sub_folders[:] = [d for d in sub_folders if not d[0] == '.'] #os.walk will not process deleted directories
 
 			#Remove excluded files
 			if args.exclude is not None:
@@ -72,8 +73,9 @@ def update(args):
 			
 			for root, sub_folders, files in os.walk(args.directory):
 				#Remove hidden files
-				files = [f for f in files if not f[0] == '.']
-				sub_folders[:] = [d for d in sub_folders if not d[0] == '.']
+				if not args.all:
+					files = [f for f in files if not f[0] == '.']
+					sub_folders[:] = [d for d in sub_folders if not d[0] == '.']
 
 				#Remove excluded files
 				if args.exclude is not None:
@@ -142,12 +144,14 @@ if __name__ == '__main__':
 	parser_index.set_defaults(func=index)
 	parser_index.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from index")
 	parser_index.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
-
+	parser_index.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in index")
+	
 	parser_update = subparsers.add_parser('update',help="Update the index with new or edited files")
 	parser_update.add_argument('directory', help="The directory to update")
 	parser_update.set_defaults(func=update)
 	parser_update.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from update")
 	parser_update.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
+	parser_update.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in index")
 
 	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
