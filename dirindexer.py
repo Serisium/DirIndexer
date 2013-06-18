@@ -114,7 +114,7 @@ def search(args):
 		from whoosh.qparser import QueryParser
 		with ix.searcher() as searcher:
 			query = QueryParser("content", ix.schema).parse(u"%s" % search_term)
-			results = searcher.search(query, terms=True)
+			results = searcher.search(query, terms=True, limit=args.limit)
 			print results
 			results.fragmenter = highlight.ContextFragmenter(maxchars=200, surround=20)
 			results.formatter = ColorFormatter(mode=args.color)
@@ -175,7 +175,8 @@ if __name__ == '__main__':
 	parser_search.add_argument('keyword', help="the search term")
 	parser_search.set_defaults(func=search)
 	parser_search.add_argument('-c', '--color', choices=['auto','always','never'], default='auto', type=str, help="Highlight the search term")
-		
+	parser_search.add_argument('-l', '--limit', type=int, default=None, help='Number of results to show; passing None will show all')
+	
 	parser_clear = subparsers.add_parser("clear", help="Delete the current index.")
 	parser_clear.set_defaults(func=clear)
 
