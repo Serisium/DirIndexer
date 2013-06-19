@@ -115,12 +115,18 @@ def search(args):
 		with ix.searcher() as searcher:
 			query = QueryParser("content", ix.schema).parse(u"%s" % search_term)
 			results = searcher.search(query, terms=True, limit=args.limit)
-			print results
 			results.fragmenter = highlight.ContextFragmenter(maxchars=200, surround=20)
-			results.formatter = ColorFormatter(mode=args.color)
+			
+			#If stdin == stdout, the programs output is not being piped and colored output is fine
+			color  = (args.color == 'always' or (args.color == 'auto' and os.fstat(0) == os.fstat(1)))
+			results.formatter = ColorFormatter(color=color)
+
+			print results
 			for i, result in enumerate(results):
-				print "Result " + str(i) + ": " + result["path"]
-				
+				if color:
+					print "Results %i: \033[1;32m%s\033[1;m" % (i, result["path"])
+				else:
+					print "Results %i: %s" % (i, result["path"])
 				with codecs.open(result["path"], encoding='utf-8', errors='ignore') as f:
 					file_content = f.read()
 				print result.highlights("content", text=file_content, top=10)
@@ -131,15 +137,13 @@ def search(args):
 class ColorFormatter(highlight.Formatter):
 	#Formatter for seach output
 
-	def __init__(self, between="\n", mode='auto'):
+	def __init__(self, between="\n", color=True):
 		self.between = between
-		self.mode = mode
-
+		self.color = color
 	def format_token(self, text, token, replace=False):
 		tokentext = highlight.get_text(text, token, False)
-		#If stdin == stdout, the programs output is not being piped and colored output is fine
-		if self.mode == 'always' or (self.mode == 'auto' and os.fstat(0) == os.fstat(1)):
-			return "\033[1;31m%s\033[1;m" % tokentext
+		if self.color:
+			return "\033[1;43m%s\033[1;m" % tokentext
 		else:
 			return tokentext
 
