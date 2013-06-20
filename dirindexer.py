@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.fields import *
@@ -134,18 +136,6 @@ def search(args):
 	finally:
 		ix.close()
 
-class ColorFormatter(highlight.Formatter):
-	#Formatter for seach output
-
-	def __init__(self, between="\n", color=True):
-		self.between = between
-		self.color = color
-	def format_token(self, text, token, replace=False):
-		tokentext = highlight.get_text(text, token, False)
-		if self.color:
-			return "\033[1;43m%s\033[1;m" % tokentext
-		else:
-			return tokentext
 
 def clear(args):
 	print "Deleting the current index..."
@@ -157,7 +147,7 @@ def clear(args):
 			os.rmdir(os.path.join(root,name))
 	os.rmdir(os.getcwd()+"/.indexdir/")
 
-if __name__ == '__main__':
+def main():
 	parser = argparse.ArgumentParser(description='index a directory or search for keywords.')
 	subparsers = parser.add_subparsers()
 
@@ -187,3 +177,16 @@ if __name__ == '__main__':
 	args=parser.parse_args()
 	args.func(args)
 
+
+class ColorFormatter(highlight.Formatter):
+	#Formatter for seach output
+
+	def __init__(self, between="\n", color=True):
+		self.between = between
+		self.color = color
+	def format_token(self, text, token, replace=False):
+		tokentext = highlight.get_text(text, token, False)
+		if self.color:
+			return "\033[1;43m%s\033[1;m" % tokentext
+		else:
+			return tokentext
