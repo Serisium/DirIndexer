@@ -7,7 +7,7 @@ setup(name='DirIndexer',
 	scripts=['dirindexer.py'],
 	entry_points= {
 		'console_scripts': [
-			'dirindexer = dirindexer:main'
+			'dirindexer = dirindexer:start'
 		]
 	},
 	install_requires='Whoosh>=2.4.1'

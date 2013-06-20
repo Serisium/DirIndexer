@@ -1,3 +1,7 @@
 files
 *sublime*
 .indexdir
+build/
+dist/
+DirIndexer.egg-info/
+
