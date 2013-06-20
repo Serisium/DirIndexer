@@ -29,7 +29,7 @@ def index(args):
 		writer = ix.writer(procs=procs)
 		dir_nm = u"%s" % args.directory
 		x=0
-		for root, sub_folders, files in os.walk(dir_nm):
+		for root, sub_folders, files in os.walk(dir_nm, followlinks=True):
 			#Remove hidden files
 			if not args.all:
 				files = [f for f in files if not f[0] == '.']
