@@ -39,7 +39,7 @@ def scan_directory(dir_nm, writer, all, exclude, checknew=False, to_index=set(),
 		if exclude:
 			files = [f for f in files if not os.path.splitext(f)[1][1:] in exclude]
 
-		for cur_file in files:
+	for cur_file in files:
 			path = unicode(os.path.join(root, cur_file))
 
 			#If a file is in the queue or is new, add it
@@ -131,12 +131,17 @@ def search(args):
 			color  = (args.color == 'always' or (args.color == 'auto' and os.fstat(0) == os.fstat(1)))
 			results.formatter = ColorFormatter(color=color)
 
+			#Remove excluded filetypes from search results
+			if args.exclude:
+				results = [f for f in results if not os.path.splitext(f["path"])[1][1:] in args.exclude]
+
+
 			print results
 			for i, result in enumerate(results):
 				if color:
-					print "Results %i: " % i + colorama.Fore.GREEN + result["path"] + colorama.Fore.RESET
+					print "Result %i: " % i + colorama.Fore.GREEN + result["path"] + colorama.Fore.RESET
 				else:
-					print "Results %i: %s" % (i, result["path"])
+					print "Result %i: %s" % (i, result["path"])
 				with codecs.open(result["path"], encoding='utf-8', errors='ignore') as f:
 					file_content = f.read()
 					print result.highlights("content", text=file_content, top=10)
@@ -193,6 +198,7 @@ def start():
 	parser_search.set_defaults(func=search)
 	parser_search.add_argument('-c', '--color', choices=['auto','always','never'], default='auto', type=str, help="Highlight the search term")
 	parser_search.add_argument('-l', '--limit', type=int, default=None, help='Number of results to show; passing None will show all')
+	parser_search.add_argument('-x', "--exclude", nargs='+', help="Exclude specified filetypes from search")
 
 	parser_clear = subparsers.add_parser("clear", help="Delete the current index.")
 	parser_clear.set_defaults(func=clear)
