@@ -27,8 +27,9 @@ def get_cores(args):
 
 	return cores
 
-def scan_directory(dir_nm, writer, all, exclude, checknew=False, to_index=set(), indexed_paths=set()):
+def scan_directory(dir_nm, writer, all, exclude, include, checknew=False, to_index=set(), indexed_paths=set()):
 	x = 0
+	print dir_nm
 	for root, sub_folders, files in os.walk(dir_nm, followlinks=True):
 		#Remove hidden files
 		if not all:
@@ -38,8 +39,10 @@ def scan_directory(dir_nm, writer, all, exclude, checknew=False, to_index=set(),
 		#Remove excluded files
 		if exclude:
 			files = [f for f in files if not os.path.splitext(f)[1][1:] in exclude]
+		if include:
+			files = [f for f in files if os.path.splitext(f)[1][1:] in include]
 
-	for cur_file in files:
+		for cur_file in files:
 			path = unicode(os.path.join(root, cur_file))
 
 			#If a file is in the queue or is new, add it
@@ -62,9 +65,7 @@ def index(args):
 		dir_nm = unicode(args.directory)
 
 		#recursively scan the directory and add files
-		x = 0
-		x = scan_directory(dir_nm, writer, args.all, args.exclude)
-
+		x = scan_directory(dir_nm, writer, args.all, args.exclude, args.include)
 	finally:
 		print "Writing %d files to index" % x
 		writer.commit()
@@ -100,7 +101,7 @@ def update(args):
 						writer.delete_by_term('path',indexed_path)
 						to_index.add(indexed_path)
 
-			x = scan_directory(args.directory, writer, args.all, args.exclude, True, to_index, indexed_paths)
+			x = scan_directory(args.directory, writer, args.all, args.exclude, args.include, True, to_index, indexed_paths)
 
 	finally:
 		print "Writing " + str(x) + " files to index."
@@ -134,7 +135,8 @@ def search(args):
 			#Remove excluded filetypes from search results
 			if args.exclude:
 				results = [f for f in results if not os.path.splitext(f["path"])[1][1:] in args.exclude]
-
+			if args.include:
+				results = [f for f in results if os.path.splitext(f["path"])[1][1:] in args.include]
 
 			print results
 			for i, result in enumerate(results):
@@ -182,14 +184,18 @@ def start():
 	parser_index = subparsers.add_parser('index', help="Index a given directory for future searches")
 	parser_index.add_argument('directory', help="the directory to search")
 	parser_index.set_defaults(func=index)
-	parser_index.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from index")
+	parser_index_filegroup = parser_index.add_mutually_exclusive_group()
+	parser_index_filegroup.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from index")
+	parser_index_filegroup.add_argument("-i", "--include", nargs='+', help="Include only the specified filetypes in the index")
 	parser_index.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
 	parser_index.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in index")
 
 	parser_update = subparsers.add_parser('update',help="Update the index with new or edited files")
 	parser_update.add_argument('directory', help="The directory to update")
 	parser_update.set_defaults(func=update)
-	parser_update.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from update")
+	parser_update_filegroup = parser_update.add_mutually_exclusive_group()
+	parser_update_filegroup.add_argument("-x", "--exclude", nargs='+', help="Exclude specified filetypes from update")
+	parser_update_filegroup.add_argument("-i", "--include", nargs='+', help="Include only the specified filetypes in the update")
 	parser_update.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
 	parser_update.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in update")
 
@@ -198,8 +204,10 @@ def start():
 	parser_search.set_defaults(func=search)
 	parser_search.add_argument('-c', '--color', choices=['auto','always','never'], default='auto', type=str, help="Highlight the search term")
 	parser_search.add_argument('-l', '--limit', type=int, default=None, help='Number of results to show; passing None will show all')
-	parser_search.add_argument('-x', "--exclude", nargs='+', help="Exclude specified filetypes from search")
-
+	parser_search_filegroup = parser_search.add_mutually_exclusive_group()
+	parser_search_filegroup.add_argument('-x', "--exclude", nargs='+', help="Exclude specified filetypes from search")
+	parser_search_filegroup.add_argument('-i', "--include", nargs='+', help="Include only the specified filetypes in the search")
+	
 	parser_clear = subparsers.add_parser("clear", help="Delete the current index.")
 	parser_clear.set_defaults(func=clear)
 
