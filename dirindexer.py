@@ -8,6 +8,7 @@ import os
 import argparse
 import codecs
 import multiprocessing
+import colorama
 
 def get_ix():
 	schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
@@ -133,7 +134,7 @@ def search(args):
 			print results
 			for i, result in enumerate(results):
 				if color:
-					print "Results %i: \033[1;32m%s\033[1;m" % (i, result["path"])
+					print "Results %i: " % i + colorama.Fore.GREEN + result["path"] + colorama.Fore.RESET
 				else:
 					print "Results %i: %s" % (i, result["path"])
 				with codecs.open(result["path"], encoding='utf-8', errors='ignore') as f:
@@ -163,11 +164,13 @@ class ColorFormatter(highlight.Formatter):
 	def format_token(self, text, token, replace=False):
 		tokentext = highlight.get_text(text, token, False)
 		if self.color:
-			return "\033[1;43m%s\033[1;m" % tokentext
+			return colorama.Back.YELLOW + tokentext + colorama.Back.RESET
 		else:
 			return tokentext
 
 def start():
+	colorama.init();
+	
 	parser = argparse.ArgumentParser(description='index a directory or search for keywords.')
 	subparsers = parser.add_subparsers()
 
