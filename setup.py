@@ -17,5 +17,6 @@ setup(name='DirIndexer',
 	install_requires=[
 		'Whoosh>=2.4.1',
 		'colorama>=0.2.5'
-		]
+		'watchdog>=0.6.0'
+	]
 )

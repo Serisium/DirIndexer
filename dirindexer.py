@@ -1,14 +1,20 @@
-#!/usr/bin/env python
+#!usr/bin/env python
 
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.fields import *
 from whoosh import highlight
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 import os
 import argparse
 import codecs
 import multiprocessing
 import colorama
+import sys
+import time
+import logging
+
 
 def get_ix():
 	schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
@@ -91,14 +97,14 @@ def update(args):
 
 				#if the file has been deleted, remove it from the index
 				if not os.path.exists(indexed_path):
-					writer.delete_by_term('path',indexed_path)
+					remove_doc(writer, indexed_path)
 				else:
 					indexed_time = fields['date']
 					mtime = os.path.getmtime(indexed_path)
 
 					#If file has been changed, delete it and add it to the queue
 					if mtime > indexed_time:
-						writer.delete_by_term('path',indexed_path)
+						remove_doc(writer, indexed_path)
 						to_index.add(indexed_path)
 
 			x = scan_directory(args.directory, writer, args.all, args.exclude, args.include, True, to_index, indexed_paths)
@@ -108,6 +114,22 @@ def update(args):
 		writer.commit()
 		ix.close()
 
+def daemon(args):
+	ix = get_ix()
+	writer=ix.writer()
+	event_handler = IndexWriterEventHandler(writer)
+	observer = Observer()
+	observer.schedule(event_handler, path=args.directory, recursive=True)
+	observer.start()
+	try:
+		while True:
+			time.sleep(1)
+	except KeyboardInterrupt:
+		observer.stop()
+		writer.commit()
+		ix.close()
+	observer.join()
+
 def add_doc(writer, path):
 	cur_file = codecs.open(path, encoding = 'utf-8', errors='ignore')
 	content = cur_file.read()
@@ -116,6 +138,10 @@ def add_doc(writer, path):
 	modtime = os.path.getmtime(path)
 	print "Indexing %s" % file_name
 	writer.add_document(title=file_name, path=path, content=content, date=modtime)
+
+def remove_doc(writer, path):
+	print "Removing %s" % path
+	writer.delete_by_term('path', path)
 
 def search(args):
 	try:
@@ -175,6 +201,25 @@ class ColorFormatter(highlight.Formatter):
 		else:
 			return tokentext
 
+class IndexWriterEventHandler(FileSystemEventHandler):
+	def __init__(self, writer):
+		self.writer = writer
+
+	def on_created(self, event):
+		add_doc(self.writer, event.src_path)
+
+	def on_moved(self, event):
+		remove_doc(self.writer, event.src_path)
+		add_doc(self.writer, event.dest_path)
+	
+	def on_deleted(self, event):
+		remove_doc(self.writer, event.src_path)
+
+	def on_modified(self, event):
+		remove_doc(self.writer, event.src_path)
+		add_doc(self.writer, event.src_path)
+		
+
 def start():
 	colorama.init();
 	
@@ -198,6 +243,14 @@ def start():
 	parser_update_filegroup.add_argument("-i", "--include", nargs='+', help="Include only the specified filetypes in the update")
 	parser_update.add_argument("-p", "--processors", type=int, help="Number of processors to utilize")
 	parser_update.add_argument("-a", "--all", action='store_true', help="Include hidden files and folders in update")
+
+	parser_daemon = subparsers.add_parser('daemon', help="Start a daemon to automatically update the index.")
+	parser_daemon.add_argument('directory', help="The directory to watch.")
+	parser_daemon.set_defaults(func=daemon)
+	parser_daemon_filegroup = parser_daemon.add_mutually_exclusive_group()
+	parser_daemon_filegroup.add_argument("-x", "--exclude", nargs='+', help="Exclude the specified filetypes from the updates.")
+	parser_daemon_filegroup.add_argument("-i", "--include", nargs='+', help="Include only the specified filetypes in the updates.")
+	parser_daemon.add_argument("-a", "--all", help="Include hidden files and directories in the update.")
 
 	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
