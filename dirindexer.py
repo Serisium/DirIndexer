@@ -14,7 +14,7 @@ import colorama
 import sys
 import time
 import logging
-
+import Queue
 
 def get_ix():
 	schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
@@ -117,10 +117,14 @@ def update(args):
 def daemon(args):
 	ix = get_ix()
 	writer=ix.writer()
-	event_handler = IndexWriterEventHandler(writer)
+	event_handler = IndexWriterEventHandler(writer, args.all, args.exclude, args.include)
 	observer = Observer()
 	observer.schedule(event_handler, path=args.directory, recursive=True)
 	observer.start()
+	#observer.should_keep_running()
+	
+	
+	
 	try:
 		while True:
 			time.sleep(1)
@@ -202,23 +206,49 @@ class ColorFormatter(highlight.Formatter):
 			return tokentext
 
 class IndexWriterEventHandler(FileSystemEventHandler):
-	def __init__(self, writer):
+	def __init__(self, writer, all=False, exclude = [], include = None):
 		self.writer = writer
+		self.all = all
+		self.exclude = exclude
+		self.include = include
+		print("Init")		
+
+	def pathIsGood(self, path):
+		if not self.all:
+			if os.path.basename(path)[0] == '.':
+				return False
+		if self.exclude:
+			if os.path.splitext(path)[1][1:] in self.exclude:
+				return False
+		if self.include:
+			if os.path.splitext(path)[1][1:] not in self.include:
+				return False
+		return True			
 
 	def on_created(self, event):
-		add_doc(self.writer, event.src_path)
-
+		print("on_create")
+		if self.pathIsGood(event.src_path):
+			add_doc(self.writer, event.src_path)
 	def on_moved(self, event):
+		print("on_moved")
 		remove_doc(self.writer, event.src_path)
-		add_doc(self.writer, event.dest_path)
+		if self.pathIsGood(event.dest_path):
+			add_doc(self.writer, event.dest_path)
 	
 	def on_deleted(self, event):
+		print("on_deleted")
 		remove_doc(self.writer, event.src_path)
 
 	def on_modified(self, event):
-		remove_doc(self.writer, event.src_path)
-		add_doc(self.writer, event.src_path)
+		print("on_modified")
+		if self.pathIsGood(event.src_path):
+			remove_doc(self.writer, event.src_path)
+			add_doc(self.writer, event.src_path)
 		
+class IndexTask:
+	def __init__(self, eventType):
+		self.eventType = eventType
+
 
 def start():
 	colorama.init();
@@ -250,7 +280,7 @@ def start():
 	parser_daemon_filegroup = parser_daemon.add_mutually_exclusive_group()
 	parser_daemon_filegroup.add_argument("-x", "--exclude", nargs='+', help="Exclude the specified filetypes from the updates.")
 	parser_daemon_filegroup.add_argument("-i", "--include", nargs='+', help="Include only the specified filetypes in the updates.")
-	parser_daemon.add_argument("-a", "--all", help="Include hidden files and directories in the update.")
+	parser_daemon.add_argument("-a", "--all", action='store_true', help="Include hidden files and directories in the update.")
 
 	parser_search = subparsers.add_parser('search', help="Search the indexed directory for a keyword")
 	parser_search.add_argument('keyword', help="the search term")
