@@ -6,10 +6,12 @@ from whoosh.fields import *
 from whoosh import highlight
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import watchdog.utils
 import os
 import argparse
 import codecs
 import multiprocessing
+import threading
 import colorama
 import sys
 import time
@@ -234,15 +236,34 @@ class IndexWriterEventHandler(FileSystemEventHandler):
 		self.all = all
 		self.exclude = exclude
 		self.include = include
-	
-	#def dispatch(self, event):
-	#	self.on_any_event(event)
-	#	self.q.put(event)
+		self.queue = Queue.LifoQueue()
+		self.clear_queue()
+		
+	def dispatch(self, event):
+		print("Adding event to queue...")
+		self.on_any_event(event)
+		self.queue.put(event)
 	
 	def clear_queue(self):
-		while not self.q.empty():
-			return FileSystemEventHandler.dispatch(self, self.q.get())
-	
+		print("Emtpying queue...")
+		urls = []
+		while not self.queue.empty():
+			event = self.queue.get()
+			if watchdog.utils.has_attribute(event, 'dest_path'):
+				if event.dest_path not in urls:
+					urls.append(event.dest_path)
+					FileSystemEventHandler.dispatch(self, event)
+			else:
+				if event.src_path not in urls:
+					urls.append(event.src_path)
+					FileSystemEventHandler.dispatch(self, event)
+		if urls != []:
+			print("Commiting %i changes." % len(urls))
+			self.writer.commit()
+			print("Done.")
+		
+		threading.Timer(5.0, self.clear_queue).start()
+
 	def pathIsGood(self, path):
 		if not self.all:
 			if os.path.basename(path)[0] == '.':
