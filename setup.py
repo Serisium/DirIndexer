@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='DirIndexer',
-	version='1.0',
+	version='1.1',
 	description='Pure Python command line utility for efficiently indexing then searching a directory',
 	author='Garrett Greenwood, David Sounthiraraj',
 	author_email='garrettagreenwood@gmail.com',
@@ -16,7 +16,7 @@ setup(name='DirIndexer',
 	},
 	install_requires=[
 		'Whoosh>=2.4.1',
-		'colorama>=0.2.5'
+		'colorama>=0.2.5',
 		'watchdog>=0.6.0'
 	]
 )
