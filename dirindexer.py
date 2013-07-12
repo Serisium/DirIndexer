@@ -3,6 +3,7 @@
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.fields import *
+from whoosh.analysis import SpaceSeparatedTokenizer, LowercaseFilter
 from whoosh import highlight
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -39,7 +40,7 @@ class DirIndexer:
 			pass
 		
 	def get_ix(self):
-		schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT, date=STORED)
+		schema = Schema(title=TEXT(stored=True), path=ID(stored=True,unique=True), content=TEXT(analyzer=SpaceSeparatedTokenizer() | LowercaseFilter()), date=STORED)
 		#create if not exists
 		if not os.path.exists(".indexdir"):
 			os.mkdir(".indexdir")
