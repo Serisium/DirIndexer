@@ -101,40 +101,47 @@ class DirIndexer:
     def get_cores(self):
         """Returns the appropriate number of processor cores to use"""
         cores = multiprocessing.cpu_count() / 2
+
         if self.processors:
             cores = self.processors
 
         return cores
 
-    def scan_directory(self,
-                       dir_nm,
-                       writer,
-                       all,
-                       exclude,
-                       include,
-                       checknew=False,
-                       to_index=set(),
-                       indexed_paths=set()
-                       ):
+    def scan_directory(self, dir_nm, writer, checknew=False,
+                       to_index=set(), indexed_paths=set()):
         """
-        Scans a directory
+        Scans a directory, adds files to be processed to the index
+        writer, then returns the number of changes
+        Does not commit changes
+
+        Parameters
+        ----------
+        dir_nm : str
+            The directory to scan
+        writer : whoosh.writing.IndexWriter
+            The whoosh index writer object to use
+        checknew : bool, optional
+
+
         """
         x = 0
         print dir_nm
         for root, sub_folders, files in os.walk(dir_nm, followlinks=True):
             #Remove hidden files
-            if not all:
+            if not self.all:
                 files = [f for f in files if not f[0] == '.']
                 #os.walk will not process deleted directories
                 sub_folders[:] = [d for d in sub_folders if not d[0] == '.']
 
             #Remove excluded files
-            if exclude:
+            if self.exclude:
                 files = [f for f in files
-                         if not os.path.splitext(f)[1][1:] in exclude]
-            if include:
+                         if not os.path.splitext(f)[1][1:]
+                         in self.exclude]
+            if self.include:
                 files = [f for f in files
-                         if os.path.splitext(f)[1][1:] in include]
+                         if os.path.splitext(f)[1][1:]
+                         in self.include]
 
             for cur_file in files:
                 path = unicode(os.path.join(root, cur_file))
@@ -154,16 +161,12 @@ class DirIndexer:
 
         #get the number of cores to use
         procs = self.get_cores()
-
         writer = ix.writer(procs=procs)
         dir_nm = unicode(self.directory)
 
         #recursively scan the directory and add files
-        x = self.scan_directory(dir_nm,
-                                writer,
-                                self.all,
-                                self.exclude,
-                                self.include)
+        x = self.scan_directory(dir_nm, writer)
+
     #finally:
         print "Writing %d files to index" % x
         writer.commit()
@@ -199,14 +202,8 @@ class DirIndexer:
                             self.remove_doc(writer, indexed_path)
                             to_index.add(indexed_path)
 
-                x = self.scan_directory(self.directory,
-                                        writer,
-                                        self.all,
-                                        self.exclude,
-                                        self.include,
-                                        True,
-                                        to_index,
-                                        indexed_paths)
+                x = self.scan_directory(
+                    self.directory, writer, True, to_index, indexed_paths)
 
         finally:
             print "Writing " + str(x) + " files to index."
@@ -285,8 +282,9 @@ class DirIndexer:
                 print results
                 for i, result in enumerate(results, start=1):
                     if color:
-                        print "Result %i: " % i + colorama.Fore.GREEN
-                        + result["path"] + colorama.Fore.RESET
+                        print "Result %i: %s" % (
+                            i, colorama.Fore.GREEN + result["path"]
+                            + colorama.Fore.RESET)
                     else:
                         print "Result %i: %s" % (i, result["path"])
                     with codecs.open(result["path"],
