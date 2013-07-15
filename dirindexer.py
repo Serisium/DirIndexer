@@ -1,4 +1,4 @@
-#!usr/bin/env python
+#usr/bin/env python
 
 from whoosh.index import create_in
 from whoosh.index import open_dir
@@ -121,8 +121,19 @@ class DirIndexer:
         writer : whoosh.writing.IndexWriter
             The whoosh index writer object to use
         checknew : bool, optional
+           Whether to only add new files or files from new folders
+           to the index
+        to_index : set, str, optional
+            For use with checknew
+            A list of new directories to index
+        indexed_paths : set, str, optional
+            For use with checknew
+            A list of directories that have already been searched
 
-
+        Returns
+        -------
+        x : int
+            Number of files that have been added to the index
         """
         x = 0
         print dir_nm
