@@ -4,6 +4,7 @@ from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.fields import Schema, TEXT, ID, STORED
 from whoosh.analysis import SpaceSeparatedTokenizer, LowercaseFilter
+from whoosh.writing import BufferedWriter
 from whoosh import highlight
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -46,6 +47,10 @@ class DirIndexer:
                     Whether to include hidden files and directories in
                     the process
 
+            daemon(continued):
+                delay : float
+                    Amount of time to wait in between each index commit.
+
             search:
                 keyword : str
                     The keyword to search for
@@ -72,6 +77,11 @@ class DirIndexer:
             self.processors = args.processors
             self.all = args.all
 
+        if args.func == DirIndexer.daemon:
+            if args.delay is not None:
+                self.delay = args.delay
+            else:
+                self.delay = 5.0
         if args.func == DirIndexer.search:
             self.keyword = args.keyword
             self.color = args.color
@@ -167,23 +177,31 @@ class DirIndexer:
         return x
 
     def index(self):
-    #try:
+        """
+        Index function
+        Adds self.directory to the index.
+        """
         ix = self.get_ix()
 
         #get the number of cores to use
         procs = self.get_cores()
+
         writer = ix.writer(procs=procs)
         dir_nm = unicode(self.directory)
 
         #recursively scan the directory and add files
         x = self.scan_directory(dir_nm, writer)
 
-    #finally:
         print "Writing %d files to index" % x
         writer.commit()
         ix.close()
 
     def update(self):
+        """
+        Update function
+        Checks self.directory for changes and adds them to the index
+        """
+
         try:
             ix = self.get_ix()
 
@@ -213,8 +231,8 @@ class DirIndexer:
                             self.remove_doc(writer, indexed_path)
                             to_index.add(indexed_path)
 
-                x = self.scan_directory(
-                    self.directory, writer, True, to_index, indexed_paths)
+                x = self.scan_directory(self.directory, writer,
+                                        True, to_index, indexed_paths)
 
         finally:
             print "Writing " + str(x) + " files to index."
@@ -222,13 +240,16 @@ class DirIndexer:
             ix.close()
 
     def daemon(self):
+        """
+        Daemon function
+        Continuosly watches self.directory for
+        changes and adds them to the index.
+        """
         ix = self.get_ix()
-        writer = ix.writer()
-        event_handler = IndexWriterEventHandler(writer,
-                                                self,
-                                                self.all,
-                                                self.exclude,
-                                                self.include)
+        writer = BufferedWriter(ix, limit=100)
+        event_handler = IndexWriterEventHandler(writer, self, self.all,
+                                                self.exclude, self.include,
+                                                )
         observer = Observer()
         observer.schedule(event_handler, path=self.directory, recursive=True)
         observer.start()
@@ -243,24 +264,30 @@ class DirIndexer:
             ix.close()
         observer.join()
 
-    def queue_timer(self, q):
-        pass
-
     def add_doc(self, writer, path):
+        """Writes a given file to the index_writer"""
+
         cur_file = codecs.open(path, encoding='utf-8', errors='ignore')
         content = cur_file.read()
         file_name = unicode(cur_file.name)
         path = unicode(path)
         modtime = os.path.getmtime(path)
         print "Indexing %s" % file_name
-        writer.add_document(
-            title=file_name, path=path, content=content, date=modtime)
+        writer.add_document(title=file_name, path=path,
+                            content=content, date=modtime)
 
     def remove_doc(self, writer, path):
+        """Removes a given file from index_writer"""
+
         print "Removing %s" % path
         writer.delete_by_term('path', path)
 
     def search(self):
+        """
+        Search function
+        Searches all indexes for self.keyword and prints them.
+        """
+
         try:
             ix = self.get_ix()
             search_term = unicode(self.keyword)
@@ -310,6 +337,8 @@ class DirIndexer:
             ix.close()
 
     def clear(self):
+        """Deletes all indexes"""
+
         print "Deleting the current index..."
         for root, dirs, files in os.walk(os.getcwd() + "/.indexdir/",
                                          topdown=False):
@@ -322,7 +351,7 @@ class DirIndexer:
 
 
 class ColorFormatter(highlight.Formatter):
-    #Formatter for seach output
+    """Class that handles colorized search output"""
 
     def __init__(self, between="\n", color=True):
         self.between = between
@@ -337,12 +366,18 @@ class ColorFormatter(highlight.Formatter):
 
 
 class IndexWriterEventHandler(FileSystemEventHandler):
-    def __init__(self, writer, di, all=False, exclude=[], include=None):
+    """
+    Event handler customized for updating a directory with file changes.
+    Implements a LIFO queue to eliminate redundant commits.
+    """
+    def __init__(self, writer, di, all=False,
+                 exclude=[], include=None, delay=5.0):
         self.writer = writer
         self.di = di
         self.all = all
         self.exclude = exclude
         self.include = include
+        self.delay = delay
         self.queue = Queue.LifoQueue()
         self.clear_queue()
 
@@ -352,6 +387,7 @@ class IndexWriterEventHandler(FileSystemEventHandler):
         self.queue.put(event)
 
     def clear_queue(self):
+        """Commits queue to index and clears it."""
         print("Emtpying queue...")
         urls = []
         while not self.queue.empty():
@@ -364,14 +400,19 @@ class IndexWriterEventHandler(FileSystemEventHandler):
                 if event.src_path not in urls:
                     urls.append(event.src_path)
                     FileSystemEventHandler.dispatch(self, event)
+
         if urls != []:
             print("Commiting %i changes." % len(urls))
             self.writer.commit()
             print("Done.")
 
-        threading.Timer(5.0, self.clear_queue).start()
+        threading.Timer(self.delay, self.clear_queue).start()
 
     def pathIsGood(self, path):
+        """
+        Analyzes path according to rules in self.all, self.include,
+        and self.exclude and returns whether the path passes.
+        """
         if not self.all:
             if os.path.basename(path)[0] == '.':
                 return False
@@ -384,30 +425,25 @@ class IndexWriterEventHandler(FileSystemEventHandler):
         return True
 
     def on_created(self, event):
-        print("on_create")
+        #print("on_create")
         if self.pathIsGood(event.src_path):
             self.di.add_doc(self.writer, event.src_path)
 
     def on_moved(self, event):
-        print("on_moved")
+        #print("on_moved")
         self.di.remove_doc(self.writer, event.src_path)
         if self.pathIsGood(event.dest_path):
             self.di.add_doc(self.writer, event.dest_path)
 
     def on_deleted(self, event):
-        print("on_deleted")
+        #print("on_deleted")
         self.di.remove_doc(self.writer, event.src_path)
 
     def on_modified(self, event):
-        print("on_modified")
+        #print("on_modified")
         if self.pathIsGood(event.src_path):
             self.di.remove_doc(self.writer, event.src_path)
             self.di.add_doc(self.writer, event.src_path)
-
-
-class IndexTask:
-    def __init__(self, eventType):
-        self.eventType = eventType
 
 
 def start():
@@ -467,6 +503,9 @@ def start():
     parser_daemon.add_argument(
         "-a", "--all", action='store_true',
         help="Include hidden files and directories in the update.")
+    parser_daemon.add_argument(
+        "-d", "--delay", type=float,
+        help="Delay in between commits")
 
     parser_search = subparsers.add_parser(
         'search', help="Search the indexed directory for a keyword")
