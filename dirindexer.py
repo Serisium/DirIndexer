@@ -408,7 +408,7 @@ class IndexWriterEventHandler(FileSystemEventHandler):
 
         threading.Timer(self.delay, self.clear_queue).start()
 
-    def pathIsGood(self, path):
+    def path_is_good(self, path):
         """
         Analyzes path according to rules in self.all, self.include,
         and self.exclude and returns whether the path passes.
@@ -426,13 +426,13 @@ class IndexWriterEventHandler(FileSystemEventHandler):
 
     def on_created(self, event):
         #print("on_create")
-        if self.pathIsGood(event.src_path):
+        if self.path_is_good(event.src_path):
             self.di.add_doc(self.writer, event.src_path)
 
     def on_moved(self, event):
         #print("on_moved")
         self.di.remove_doc(self.writer, event.src_path)
-        if self.pathIsGood(event.dest_path):
+        if self.path_is_good(event.dest_path):
             self.di.add_doc(self.writer, event.dest_path)
 
     def on_deleted(self, event):
@@ -441,7 +441,7 @@ class IndexWriterEventHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         #print("on_modified")
-        if self.pathIsGood(event.src_path):
+        if self.path_is_good(event.src_path):
             self.di.remove_doc(self.writer, event.src_path)
             self.di.add_doc(self.writer, event.src_path)
 
