@@ -1,5 +1,3 @@
-#usr/bin/env python
-
 from whoosh.index import create_in
 from whoosh.index import open_dir
 from whoosh.fields import Schema, TEXT, ID, STORED
